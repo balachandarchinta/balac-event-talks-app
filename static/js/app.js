@@ -27,6 +27,7 @@ const elements = {
     sortOrderBtn: document.getElementById("sort-order-btn"),
     sortIcon: document.getElementById("sort-icon"),
     sortLabel: document.getElementById("sort-label"),
+    exportCsvBtn: document.getElementById("export-csv-btn"),
     
     // Feed container & states
     feedContainer: document.getElementById("feed-container"),
@@ -81,6 +82,9 @@ function bindEvents() {
     
     // Sort handler
     elements.sortOrderBtn.addEventListener("click", toggleSortOrder);
+    
+    // Export CSV handler
+    elements.exportCsvBtn.addEventListener("click", exportToCSV);
     
     // Empty state clear handler
     elements.clearFiltersBtn.addEventListener("click", resetAllFilters);
@@ -347,6 +351,9 @@ function renderFeed() {
                         </span>
                     </div>
                     <div class="card-action-top">
+                        <button class="icon-btn-sm" onclick="copyCardText('${up.id}')" title="Copy Update Text">
+                            <i data-lucide="copy"></i>
+                        </button>
                         <button class="icon-btn-sm" onclick="copyLink('${up.link}')" title="Copy Direct Link">
                             <i data-lucide="link-2"></i>
                         </button>
@@ -482,6 +489,64 @@ window.copyLink = function(link) {
         document.body.removeChild(textArea);
     });
 };
+
+// Copy Card Text Content to Clipboard
+window.copyCardText = function(updateId) {
+    const update = appState.updates.find(up => up.id === updateId);
+    if (!update) return;
+    
+    navigator.clipboard.writeText(update.text_content).then(() => {
+        showToast("Update text copied to clipboard!");
+    }).catch(err => {
+        console.error("Clipboard error:", err);
+        const textArea = document.createElement("textarea");
+        textArea.value = update.text_content;
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showToast("Update text copied to clipboard!");
+        } catch (e) {
+            showToast("Failed to copy text.", "error");
+        }
+        document.body.removeChild(textArea);
+    });
+};
+
+// Export current view of updates to CSV
+function exportToCSV() {
+    if (appState.filteredUpdates.length === 0) {
+        showToast("No updates to export!", "error");
+        return;
+    }
+    
+    const headers = ["Date", "Type", "Link", "Content"];
+    const rows = appState.filteredUpdates.map(up => [
+        up.date,
+        up.type,
+        up.link,
+        up.text_content
+    ]);
+    
+    // Convert to CSV string, double quoting fields and escaping quotes
+    const csvContent = [
+        headers.join(","),
+        ...rows.map(row => row.map(val => `"${val.replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+    
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `bigquery_release_notes_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast("Exported CSV successfully!");
+}
 
 // UI State Switchers
 function showLoading() {
